@@ -477,7 +477,7 @@ function filtrar(){
   render();
 }
 
-function render(){document.querySelector('.loading')&&document.querySelector('.loading').remove();
+function render(){document.querySelector('.loading')&&document.querySelector('.loading').remove();document.querySelector('.loading')&&document.querySelector('.loading').remove();document.querySelector('.loading')&&document.querySelector('.loading').remove();document.querySelector('.loading')&&document.querySelector('.loading').remove();document.querySelector('.loading')&&document.querySelector('.loading').remove();
   const l=document.getElementById('lista');
   if(!vis.length){l.innerHTML='<div class="nenhum">Nenhuma empresa encontrada.</div>';document.getElementById('contador').textContent='0 empresas';updateResumo();return;}
   const wasOpen=Array.from(document.querySelectorAll('.card.open')).map(c=>c.id);const wasOpen=Array.from(document.querySelectorAll('.card.open')).map(c=>c.id);l.innerHTML=vis.map((e,i)=>card(e,D.indexOf(e))).join('');wasOpen.forEach(id=>{const c=document.getElementById(id);if(c)c.classList.add('open');});wasOpen.forEach(id=>{const c=document.getElementById(id);if(c)c.classList.add('open');});
