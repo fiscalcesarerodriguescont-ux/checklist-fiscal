@@ -459,7 +459,7 @@ function togglePend(){
   document.getElementById('btnPend').classList.toggle('ativo',sosPendentes);
   render();
 }
-function tog(i){document.getElementById('card'+i).classList.toggle('open');}
+function tog(i){document.getElementById('card'+i).classList.add('open');}
 function toggleAll(o){document.querySelectorAll('.card').forEach(c=>o?c.classList.add('open'):c.classList.remove('open'));}
 
 let vis=[];
