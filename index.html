@@ -480,7 +480,7 @@ function filtrar(){
 function render(){const openIds=Array.from(document.querySelectorAll('.card.open')).map(c=>c.id);
   const l=document.getElementById('lista');
   if(!vis.length){l.innerHTML='<div class="nenhum">Nenhuma empresa encontrada.</div>';document.getElementById('contador').textContent='0 empresas';updateResumo();return;}
-  const wasOpen=Array.from(document.querySelectorAll('.card.open')).map(c=>c.id);const wasOpen=Array.from(document.querySelectorAll('.card.open')).map(c=>c.id);const wasOpen=Array.from(document.querySelectorAll('.card.open')).map(c=>c.id);l.innerHTML=vis.map((e,i)=>card(e,D.indexOf(e))).join('');wasOpen.forEach(id=>{const c=document.getElementById(id);if(c)c.classList.add('open');});wasOpen.forEach(id=>{const c=document.getElementById(id);if(c)c.classList.add('open');});wasOpen.forEach(id=>{const c=document.getElementById(id);if(c)c.classList.add('open');});
+  const wasOpen=Array.from(document.querySelectorAll('.card.open')).map(c=>c.id);const wasOpen=Array.from(document.querySelectorAll('.card.open')).map(c=>c.id);l.innerHTML=vis.map((e,i)=>card(e,D.indexOf(e))).join('');wasOpen.forEach(id=>{const c=document.getElementById(id);if(c)c.classList.add('open');});wasOpen.forEach(id=>{const c=document.getElementById(id);if(c)c.classList.add('open');});
   document.getElementById('contador').textContent=vis.length+' empresa'+(vis.length!==1?'s':'');
   updateResumo();
 }
