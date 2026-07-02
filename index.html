@@ -383,7 +383,7 @@ function card(e,i){
   const cardHide=sosPendentes&&pct===100?' style="display:none"':'';
   const cardEnc=isEncerrada(e.c)?' style="opacity:0.6;border-left:4px solid #f5c0c0"':'';
   return`<div class="card" id="card${i}"${cardHide||cardEnc}>
-    <div class="hdr" onclick="event.stopPropagation();tog(${i})">
+    <div class="hdr" onclick="tog(${i})">
       <span class="badge ${bdg}">${bdgTxt}</span>
       ${e.ie?'<span class="badge ie-s">IE</span>':'<span class="badge no-ie">Sem IE</span>'}
       <span class="uf-b">${e.u&&e.u!=='nan'?e.u:'—'}</span>
@@ -459,7 +459,7 @@ function togglePend(){
   document.getElementById('btnPend').classList.toggle('ativo',sosPendentes);
   render();
 }
-function tog(i){const c=document.getElementById('card'+i);c.classList.add('open');}
+function tog(i){document.getElementById('card'+i).classList.toggle('open');}
 function toggleAll(o){document.querySelectorAll('.card').forEach(c=>o?c.classList.add('open'):c.classList.remove('open'));}
 
 let vis=[];
@@ -477,10 +477,10 @@ function filtrar(){
   render();
 }
 
-function render(){document.querySelector('.loading')&&document.querySelector('.loading').remove();document.querySelector('.loading')&&document.querySelector('.loading').remove();document.querySelector('.loading')&&document.querySelector('.loading').remove();document.querySelector('.loading')&&document.querySelector('.loading').remove();document.querySelector('.loading')&&document.querySelector('.loading').remove();
+function render(){
   const l=document.getElementById('lista');
   if(!vis.length){l.innerHTML='<div class="nenhum">Nenhuma empresa encontrada.</div>';document.getElementById('contador').textContent='0 empresas';updateResumo();return;}
-  const wasOpen=Array.from(document.querySelectorAll('.card.open')).map(c=>c.id);const wasOpen=Array.from(document.querySelectorAll('.card.open')).map(c=>c.id);l.innerHTML=vis.map((e,i)=>card(e,D.indexOf(e))).join('');wasOpen.forEach(id=>{const c=document.getElementById(id);if(c)c.classList.add('open');});wasOpen.forEach(id=>{const c=document.getElementById(id);if(c)c.classList.add('open');});
+  l.innerHTML=vis.map((e,i)=>card(e,D.indexOf(e))).join('');
   document.getElementById('contador').textContent=vis.length+' empresa'+(vis.length!==1?'s':'');
   updateResumo();
 }
