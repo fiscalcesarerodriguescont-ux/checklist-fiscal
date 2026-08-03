@@ -157,7 +157,7 @@ tr.pend-hide{display:none}
     <option value="">Todos</option>
     <option>Francieli</option><option>Grazielle Junglos</option><option>Murilo</option>
     <option>Suele Zabloski</option><option>Mayara</option><option>Thuane de Souza Vicente</option>
-    <option>Grasiele Bona Rodrigues</option><option>João Felipe</option><option>Jonathas</option>
+    <option>Grasiele Bona Rodrigues</option><option>Jonathas</option>
   </select>
   <label>Regime:</label>
   <select id="fReg" onchange="filtrar()">
@@ -382,7 +382,7 @@ function card(e,i){
   const rc=rcat(regimeEfetivo(e));
   const bdg={'SN':'sn','LP':'lp','LR':'lr','MEI':'mei','FI':'fi','IE':'no-ie','—':'no-ie'}[rc]||'no-ie';
   const bdgTxt={'SN':'SN','LP':'LP','LR':'LR','MEI':'MEI','FI':'Filial','IE':'Isenta','—':'—'}[rc];
-  const respMap={'Francieli':'rF','Grazielle Junglos':'rGz','Murilo':'rM','Suele Zabloski':'rS','Mayara':'rMy','Thuane de Souza Vicente':'rT','Grasiele Bona Rodrigues':'rGs','João Felipe':'rJF','Jonathas':'rJn'};
+  const respMap={'Francieli':'rF','Grazielle Junglos':'rGz','Murilo':'rM','Suele Zabloski':'rS','Mayara':'rMy','Thuane de Souza Vicente':'rT','Grasiele Bona Rodrigues':'rGs','Jonathas':'rJn'};
   const sObg  =e.sem_obg?'<div style="padding:16px;text-align:center;color:#aaa;font-size:12px">📋 Empresa apenas para consultoria — sem entrega de obrigações</div>':buildSecao('Obrigações Acessórias',obg,'Federal','fed-label','sec-obg','o',false,i);
   const sGuias=e.sem_obg?'':buildSecao('Controle de Guias',guias,'Guias','gui-label','sec-guias','g',false,i);
   const sGia  =e.sem_obg?'':buildSecao('GIA-ST / DIFAL por Estado',gia,'Estadual','gia-label','sec-gia','a',true,i);
