@@ -194,13 +194,7 @@ tr.pend-hide{display:none}
 
 <script>
 const MESES=[{k:'2026-06',l:'Jun/26'},{k:'2026-07',l:'Jul/26'},{k:'2026-08',l:'Ago/26'},{k:'2026-09',l:'Set/26'},{k:'2026-10',l:'Out/26'},{k:'2026-11',l:'Nov/26'},{k:'2026-12',l:'Dez/26'}];
-function mesAtualPadrao(){
-  const d=new Date();
-  const chave=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-  if(MESES.some(m=>m.k===chave)) return chave;
-  return chave < MESES[0].k ? MESES[0].k : MESES[MESES.length-1].k;
-}
-let mesSel=mesAtualPadrao();
+let mesSel='2026-07';
 // Empresas encerradas: CNPJ → mês início encerramento (formato 'YYYY-MM')
 const ENCERRADAS={'57.293.692/0001-20':'2026-07','94.293.917/0004-18':'2026-07'};
 function isEncerrada(cnpj){
