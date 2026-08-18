@@ -171,6 +171,13 @@ tr.pend-hide{display:none}
     <option value="">Todas</option>
     <option value="sim">Com IE</option><option value="nao">Sem IE</option>
   </select>
+  <label>Situação:</label>
+  <select id="fSit" onchange="filtrar()">
+    <option value="">Todas</option>
+    <option value="ativas">Ativas</option>
+    <option value="suspensas">Suspensas</option>
+    <option value="encerradas">Encerradas</option>
+  </select>
   <input type="text" id="fBusca" placeholder="Buscar empresa ou CNPJ..." oninput="filtrar()">
   <button class="btn btn-pend" id="btnPend" onclick="togglePend()">⚠ Só Pendentes</button>
   <span class="contador" id="contador">388 empresas</span>
@@ -484,13 +491,17 @@ function toggleAll(o){document.querySelectorAll('.card').forEach(c=>o?c.classLis
 let vis=[];
 function filtrar(){
   const rp=document.getElementById('fResp').value,rg=document.getElementById('fReg').value,
-        ie=document.getElementById('fIE').value,b=document.getElementById('fBusca').value.toLowerCase();
+        ie=document.getElementById('fIE').value,st=document.getElementById('fSit').value,
+        b=document.getElementById('fBusca').value.toLowerCase();
   vis=D.filter(e=>{
     if(e.inicio&&mesSel<e.inicio)return false;
     if(rp&&responsavelEfetivo(e)!==rp)return false;
     if(rg&&!regimeEfetivo(e).includes(rg))return false;
     if(ie==='sim'&&!e.ie)return false;
     if(ie==='nao'&&e.ie)return false;
+    if(st==='ativas'&&(isEncerrada(e.c)||isSuspensa(e.c)))return false;
+    if(st==='suspensas'&&!isSuspensa(e.c))return false;
+    if(st==='encerradas'&&!isEncerrada(e.c))return false;
     if(b&&!e.n.toLowerCase().includes(b)&&!e.c.includes(b))return false;
     return true;
   });
