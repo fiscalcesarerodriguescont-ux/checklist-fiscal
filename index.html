@@ -252,7 +252,7 @@ function salvarNome(){
 function setMes(k){
   mesSel=k;
   document.querySelectorAll('.mes-tab').forEach((b,i)=>b.classList.toggle('ativo',MESES[i].k===k));
-  render();
+  filtrar();
 }
 
 // ── Firebase sync ────────────────────────────────────────────────────────
