@@ -174,6 +174,11 @@ tr.pend-hide{display:none}
     <option value="">Todas</option>
     <option value="sim">Com IE</option><option value="nao">Sem IE</option>
   </select>
+  <label>TTD:</label>
+  <select id="fTTD" onchange="filtrar()">
+    <option value="">Todas</option>
+    <option value="sim">Com TTD</option><option value="nao">Sem TTD</option>
+  </select>
   <label>Situação:</label>
   <select id="fSit" onchange="filtrar()">
     <option value="">Todas</option>
@@ -427,11 +432,11 @@ function card(e,i){
   const cardEnc=isEncerrada(e.c)?' style="opacity:0.6;border-left:4px solid #f5c0c0"':(isSuspensa(e.c)?' style="opacity:0.75;border-left:4px solid #f0d870"':'');
   return`<div class="card" id="card${i}"${cardHide||cardEnc}>
     <div class="hdr" onclick="tog(${i})">
-      ${tipoUnidade(e)==='F'?'<span class="tag-fil" style="margin-left:0">Filial</span>':(tipoUnidade(e)==='M'?'<span class="tag-mat" style="margin-left:0">Matriz</span>':'')}${e.ttd?'<span class="tag-ttd" style="margin-left:0">TTD</span>':''}<span class="badge ${bdg}">${bdgTxt}</span>
+      <span class="badge ${bdg}">${bdgTxt}</span>
       ${e.ie?'<span class="badge ie-s">IE</span>':'<span class="badge no-ie">Sem IE</span>'}
       <span class="uf-b">${e.u&&e.u!=='nan'?e.u:'—'}</span>
       <div style="flex:1;min-width:0">
-        <div class="nome">${e.n}${isEncerrada(e.c)?'<span class="tag-enc">⛔ Encerrado a partir de '+labelMes(ENCERRADAS[e.c])+'</span>':(isSuspensa(e.c)?'<span class="tag-susp">⏸ Suspensa a partir de '+labelMes(SUSPENSAS[e.c])+'</span>':'')} ${e.sem_obg?'<span class="tag-consultoria">📋 Apenas Consultoria</span>':''} ${e.ret?'<span class="tag-ret">🏗 Guia RET</span>':''}</div>
+        <div class="nome">${e.n}${isEncerrada(e.c)?'<span class="tag-enc">⛔ Encerrado a partir de '+labelMes(ENCERRADAS[e.c])+'</span>':(isSuspensa(e.c)?'<span class="tag-susp">⏸ Suspensa a partir de '+labelMes(SUSPENSAS[e.c])+'</span>':'')} ${e.sem_obg?'<span class="tag-consultoria">📋 Apenas Consultoria</span>':''} ${e.ret?'<span class="tag-ret">🏗 Guia RET</span>':''} ${tipoUnidade(e)==='F'?'<span class="tag-fil">Filial</span>':(tipoUnidade(e)==='M'?'<span class="tag-mat">Matriz</span>':'')} ${e.ttd?'<span class="tag-ttd">TTD</span>':''}</div>
         <div class="cnpj">${e.c}${im}</div>
         <div class="prog"><div class="prog-bar${pct===100?' completo':''}" style="width:${pct}%"></div></div>
       </div>
@@ -508,7 +513,7 @@ function toggleAll(o){document.querySelectorAll('.card').forEach(c=>o?c.classLis
 let vis=[];
 function filtrar(){
   const rp=document.getElementById('fResp').value,rg=document.getElementById('fReg').value,
-        ie=document.getElementById('fIE').value,st=document.getElementById('fSit').value,
+        ie=document.getElementById('fIE').value,tt=document.getElementById('fTTD').value,st=document.getElementById('fSit').value,
         b=document.getElementById('fBusca').value.toLowerCase();
   vis=D.filter(e=>{
     if(e.inicio&&mesSel<e.inicio)return false;
@@ -519,6 +524,8 @@ function filtrar(){
     if(st==='ativas'&&(isEncerrada(e.c)||isSuspensa(e.c)))return false;
     if(st==='suspensas'&&!isSuspensa(e.c))return false;
     if(st==='encerradas'&&!isEncerrada(e.c))return false;
+    if(tt==='sim'&&!e.ttd)return false;
+    if(tt==='nao'&&e.ttd)return false;
     if(b&&!e.n.toLowerCase().includes(b)&&!e.c.includes(b))return false;
     return true;
   });
