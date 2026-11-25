@@ -417,6 +417,8 @@ function buildSecao(titulo,itens,labelTxt,labelClass,secClass,grpKey,isGia,ei){
 function card(e,i){
   const{obg,guias,gia}=getItens(e);
   const im=e.im?`<span style="font-size:10px;color:#aaa;margin-left:4px">IM: ${e.im}</span>`:'';
+  const ieD=String((typeof ST!=='undefined'&&ST['ie|'+e.c.replace(/\D/g,'')])||'').replace(/\D/g,'');
+  const ieTag=ieD?`<span style="font-size:10px;color:#aaa;margin-left:4px">IE: ${ieD.length===9?ieD.replace(/(\d{2})(\d{3})(\d{3})(\d)/,'$1.$2.$3-$4'):ieD}</span>`:'';
   const rc=rcat(regimeEfetivo(e));
   const bdg={'SN':'sn','LP':'lp','LR':'lr','MEI':'mei','FI':'fi','IE':'no-ie','—':'no-ie'}[rc]||'no-ie';
   const bdgTxt={'SN':'SN','LP':'LP','LR':'LR','MEI':'MEI','FI':'Filial','IE':'Isenta','—':'—'}[rc];
@@ -437,7 +439,7 @@ function card(e,i){
       <span class="uf-b">${e.u&&e.u!=='nan'?e.u:'—'}</span>
       <div style="flex:1;min-width:0">
         <div class="nome">${e.n}${isEncerrada(e.c)?'<span class="tag-enc">⛔ Encerrado a partir de '+labelMes(ENCERRADAS[e.c])+'</span>':(isSuspensa(e.c)?'<span class="tag-susp">⏸ Suspensa a partir de '+labelMes(SUSPENSAS[e.c])+'</span>':'')} ${e.sem_obg?'<span class="tag-consultoria">📋 Apenas Consultoria</span>':''} ${e.ret?'<span class="tag-ret">🏗 Guia RET</span>':''} ${tipoUnidade(e)==='F'?'<span class="tag-fil">Filial</span>':(tipoUnidade(e)==='M'?'<span class="tag-mat">Matriz</span>':'')} ${e.ttd?'<span class="tag-ttd">TTD</span>':''}</div>
-        <div class="cnpj">${e.c}${im}</div>
+        <div class="cnpj">${e.c}${ieTag}${im}</div>
         <div class="prog"><div class="prog-bar${pct===100?' completo':''}" style="width:${pct}%"></div></div>
       </div>
       <span style="font-size:10px;color:#999;margin:0 4px;white-space:nowrap">${ok}/${total}</span>
