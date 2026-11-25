@@ -404,7 +404,7 @@ function buildSecao(titulo,itens,labelTxt,labelClass,secClass,grpKey,isGia,ei){
     const obsVal=(ST[obsKey]&&typeof ST[obsKey]==='string')?ST[obsKey]:'';
     return`<tr id="tr_${id}" class="${okCls}${pendHide}">
       <td class="grp-label ${labelClass}">${j===0?labelTxt:''}</td>
-      <td><div class="chk-row"><input type="checkbox" id="${id}"${checked?' checked':''} onchange="ckRow('${id}','${key}',${ei},this.checked)"><label for="${id}">${nome}${ufTag}${quem}</label></div></td>
+      <td><div class="chk-row"><input type="checkbox" id="${id}"${checked?' checked':''} onchange="ckRow('${id}','${key}',${ei},this.checked)"><label for="${id}">${nome}${ufTag}${quem}</label>${window.Recibos?Recibos.btn(ei,nome,id,key):''}</div></td>
       <td><span class="per">${per}</span></td>
       <td onclick="event.stopPropagation()" style="padding:3px 6px"><textarea rows="1" style="width:100%;font-size:10px;border:0.5px solid #e0dcd0;border-radius:4px;background:#fffef9;color:#444;font-family:inherit;resize:none;outline:none;padding:3px 6px;cursor:text;box-sizing:border-box" placeholder="Anotação..." onclick="event.stopPropagation()" oninput="saveObs('${obsKey}',this.value)">${obsVal}</textarea></td>
     </tr>`;
@@ -543,6 +543,264 @@ function render(){const _op=Array.from(document.querySelectorAll('.card.open')).
 vis=[...D];
 // Render inicial (offline até Firebase responder)
 render();
+</script>
+<script>
+/* ===== Recibos de obrigações: anexar PDF + validar (somente com ?anexos=1) ===== */
+(function(root){
+'use strict';
+var PDFJS='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+var PDFW='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+// item do checklist -> tipo de recibo
+var MAPA={'PGDAS-D':'PGDAS-D','DCTFWeb':'DCTFWEB','DCTFWeb (se retenções)':'DCTFWEB','EFD-Contribuições (PIS/COFINS)':'EFD-CONTRIBUICOES','EFD-ICMS/IPI (SPED)':'EFD-ICMS-IPI','DIME':'DIME'};
+var NOME={'PGDAS-D':'PGDAS-D','DCTFWEB':'DCTFWeb','EFD-CONTRIBUICOES':'EFD-Contribuições','EFD-ICMS-IPI':'EFD ICMS/IPI (SPED Fiscal)','DIME':'DIME'};
+// competência esperada = mês da aba menos N meses (0 = o próprio mês da aba)
+var DESLOC={'PGDAS-D':0,'DCTFWEB':0,'EFD-CONTRIBUICOES':0,'EFD-ICMS-IPI':0,'DIME':0};
+var CNPJ=/\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}/g;
+
+function so(s){return String(s==null?'':s).replace(/\D/g,'');}
+function limpa(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/\s+/g,' ').trim();}
+function nomeNorm(s){return limpa(s).replace(/[^A-Z0-9 ]/g,' ').replace(/\b(LTDA|ME|EPP|EIRELI|SA|S A)\b/g,' ').replace(/\s+/g,' ').trim();}
+function nomesBatem(a,b){var x=nomeNorm(a),y=nomeNorm(b);return x===y||(x.length>=8&&y.length>=8&&(x.indexOf(y)===0||y.indexOf(x)===0));}
+function ultimoDia(m,a){return new Date(a,m,0).getDate();}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function fmtCNPJ(d){d=so(d);return d.length===14?d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,'$1.$2.$3/$4-$5'):d;}
+function fmtIE(d){d=so(d);return d.length===9?d.replace(/(\d{2})(\d{3})(\d{3})(\d)/,'$1.$2.$3-$4'):d;}
+function compEsperada(mesSel,desloc){var p=mesSel.split('-');var a=+p[0],m=+p[1]-(desloc||0);while(m<1){m+=12;a--;}return {mm:('0'+m).slice(-2),aa:String(a)};}
+
+function detectar(T){
+ if(/RECEPCAO DE DECLARACOES DO ICMS/.test(T)&&/ENVIO DE DECLARACAO/.test(T))return 'DIME';
+ if(/DCTFWEB/.test(T)&&/RECIBO DE ENTREGA DA DECLARACAO DE DEBITOS E CREDITOS TRIBUTARIOS FEDERAIS/.test(T))return 'DCTFWEB';
+ if(/ESCRITURACAO FISCAL DIGITAL\s*-\s*CONTRIBUICOES/.test(T))return 'EFD-CONTRIBUICOES';
+ if(/RECIBO DE ENTREGA DE ESCRITURACAO FISCAL DIGITAL/.test(T)&&/SPED FISCAL/.test(T))return 'EFD-ICMS-IPI';
+ if(/DOCUMENTO DE ARRECADACAO DO SIMPLES NACIONAL/.test(T)&&/DECLARATORIO/.test(T))return 'PGDAS-D';
+ return null;
+}
+function primeiroCNPJ(T){var c=T.match(CNPJ);return c?so(c[0]):null;}
+function periodo(T,r){
+ var m=T.match(/(\d{2})\/(\d{2})\/(\d{4})\s+A\s+(\d{2})\/(\d{2})\/(\d{4})/);
+ if(!m)return;
+ r.mm=m[2];r.aa=m[3];
+ r.mesCheio=(m[1]==='01'&&m[5]===m[2]&&m[6]===m[3]&&(+m[4])===ultimoDia(+m[2],+m[3]));
+}
+function reciboPontilhado(T){
+ var J=T.replace(/\.\s+/g,'.');
+ var m=J.match(/([0-9A-F]{2}(?:\.[0-9A-F]{2}){19}-\d)/);
+ return m?m[1]:null;
+}
+var PARSERS={
+ 'DIME':function(T){
+  var r={},m;
+  m=T.match(/PROTOCOLO\s*:\s*(\d{8,})/);r.recibo=m?m[1]:null;
+  m=T.match(/DATA TRANSM\.?\s*:\s*(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2}(?::\d{2})?)/);r.data=m?m[1]:null;
+  m=T.match(/(\d{2}\.\d{3}\.\d{3}-\d)\s+(.+?)\s+(\d{2})\/(\d{4})\s+(.+?)\s+III - AVISOS/);
+  if(m){r.ie=so(m[1]);r.nomeDoc=m[2];r.mm=m[3];r.aa=m[4];r.situacao=m[5];r.aceita=/^ACEITA\b/.test(m[5]);}
+  return r;
+ },
+ 'DCTFWEB':function(T){
+  var r={},m;
+  r.cnpj=primeiroCNPJ(T);
+  m=T.match(/PERIODO DE APURACAO\s+(\d{2})\/(\d{4})/);if(m){r.mm=m[1];r.aa=m[2];}
+  m=T.match(/RETIFICADORA\s+(SIM|NAO)/);r.retif=m?m[1]==='SIM':false;
+  m=T.match(/N\S{0,2}\s+DO RECIBO DE ENTREGA\s+(\d{10,})/);r.recibo=m?m[1]:null;
+  m=T.match(/SERPRO EM (\d{2}\/\d{2}\/\d{4}\s+[\d:]+)/);r.data=m?m[1]:null;
+  m=T.match(/NOME\s+(.+?)\s+PERIODO DE APURACAO/);r.nomeDoc=m?m[1]:null;
+  return r;
+ },
+ 'EFD-CONTRIBUICOES':function(T){
+  var r={},m;
+  r.cnpj=primeiroCNPJ(T);periodo(T,r);
+  r.retif=!/\bORIGINAL\b/.test(T);
+  r.recibo=reciboPontilhado(T);
+  if(!r.recibo){m=T.match(/IDENTIFICACAO DO ARQUIVO:\s*([0-9A-F]{40})/);r.recibo=m?m[1]:null;}
+  m=T.match(/RECEITANET:\s*(\d{2}\/\d{2}\/\d{4})/);r.data=m?m[1]:null;
+  return r;
+ },
+ 'EFD-ICMS-IPI':function(T){
+  var r={},m;
+  r.cnpj=primeiroCNPJ(T);periodo(T,r);
+  m=T.match(/(\d{8,12})\s+[A-Z]{2}\s+UF\s*:/)||T.match(/INSCRICAO ESTADUAL\s*:?\s*(\d{8,12})/);r.ie=m?m[1]:null;
+  r.retif=!/\bORIGINAL\b/.test(T);
+  r.recibo=reciboPontilhado(T);
+  m=T.match(/HASH DO ARQUIVO:\s*([0-9A-F]{32})/);r.hash=m?m[1]:null;
+  if(!r.recibo)r.recibo=r.hash;
+  m=T.match(/RECEITANET:\s*(\d{2}\/\d{2}\/\d{4})/);r.data=m?m[1]:null;
+  return r;
+ },
+ 'PGDAS-D':function(T){
+  var r={},m;
+  m=T.match(/CNPJ MATRIZ:\s*(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})/);r.cnpj=m?so(m[1]):null;
+  m=T.match(/CNPJ DAS FILIAIS PRESENTES NESTA DECLARACAO:\s*(.*?)\s*2\.\s*APURACAO/);
+  r.filiais=m?(m[1].match(CNPJ)||[]).map(so):[];
+  m=T.match(/PERIODO DE APURACAO:\s*(\d{2})\/(\d{2})\/(\d{4})\s+A\s+(\d{2})\/(\d{2})\/(\d{4})/);
+  if(m){r.mm=m[2];r.aa=m[3];r.mesCheio=(m[1]==='01'&&m[5]===m[2]&&m[6]===m[3]&&(+m[4])===ultimoDia(+m[2],+m[3]));}
+  r.retif=!/DECLARACAO ORIGINAL/.test(T);
+  m=T.match(/NUMERO DO RECIBO:\s*([\d.\-]+)/);r.recibo=m?m[1]:null;
+  m=T.match(/NOME EMPRESARIAL:\s*(.+?)\s+DATA DE ABERTURA/);r.nomeDoc=m?m[1]:null;
+  return r;
+ }
+};
+
+// o: {tipoEsperado, texto, empresa:{c,n}, mesSel:'YYYY-MM', ieSalva}
+function validar(o){
+ var res={ok:false,erros:[],avisos:[],dados:null,vincularIE:null,ilegivel:false};
+ var T=limpa(o.texto||'');
+ if(T.length<60){res.ilegivel=true;res.erros.push('Não consegui ler texto neste PDF (parece escaneado ou imagem).');return res;}
+ var tipo=detectar(T);
+ if(!tipo){res.erros.push('Não reconheci este PDF como recibo de DCTFWeb, EFD-Contribuições, EFD ICMS/IPI, DIME ou PGDAS-D.');return res;}
+ if(tipo!==o.tipoEsperado){res.erros.push('Este arquivo é um recibo de '+NOME[tipo]+', mas o item é '+NOME[o.tipoEsperado]+'.');return res;}
+ var d=PARSERS[tipo](T);d.tipo=tipo;res.dados=d;
+ var cnpjE=so(o.empresa.c);
+ if(!d.mm||!d.aa){res.erros.push('Não encontrei a competência neste recibo.');return res;}
+ if(tipo==='DIME'){
+  if(o.ieSalva){
+   if(so(o.ieSalva)!==d.ie)res.erros.push('A inscrição estadual do recibo ('+fmtIE(d.ie)+') é diferente da cadastrada para esta empresa ('+fmtIE(o.ieSalva)+').');
+  }else if(nomesBatem(o.empresa.n,d.nomeDoc)){
+   res.vincularIE={ie:d.ie,nome:d.nomeDoc};
+  }else{
+   res.erros.push('O nome no recibo ('+d.nomeDoc+') não corresponde à empresa ('+o.empresa.n+').');
+  }
+ }else if(tipo==='PGDAS-D'){
+  var lista=[d.cnpj].concat(d.filiais||[]);
+  if(lista.indexOf(cnpjE)<0){
+   var raiz=d.cnpj&&d.cnpj.slice(0,8)===cnpjE.slice(0,8);
+   res.erros.push(raiz?'Esta empresa não consta nesta declaração (matriz '+fmtCNPJ(d.cnpj)+'; filiais: '+((d.filiais||[]).map(fmtCNPJ).join(', ')||'nenhuma')+').':'O CNPJ do recibo ('+fmtCNPJ(d.cnpj)+') é diferente do da empresa ('+fmtCNPJ(cnpjE)+').');
+  }
+ }else if(d.cnpj!==cnpjE){
+  var raiz2=d.cnpj&&d.cnpj.slice(0,8)===cnpjE.slice(0,8);
+  res.erros.push('O CNPJ do recibo ('+fmtCNPJ(d.cnpj)+') é diferente do da empresa ('+fmtCNPJ(cnpjE)+')'+(raiz2?', embora seja do mesmo grupo (outro estabelecimento).':'.'));
+ }
+ var ce=compEsperada(o.mesSel,DESLOC[tipo]);
+ if(d.mm!==ce.mm||d.aa!==ce.aa)res.erros.push('Competência do recibo: '+d.mm+'/'+d.aa+'. O esperado nesta aba é '+ce.mm+'/'+ce.aa+'.');
+ if(d.mesCheio===false)res.erros.push('O período do recibo não é o mês completo.');
+ if(tipo==='DIME'&&d.aceita===false)res.erros.push('Declaração não aceita pela SEFAZ: '+d.situacao+'.');
+ if(d.retif)res.avisos.push('Recibo de declaração retificadora.');
+ res.ok=res.erros.length===0;
+ return res;
+}
+
+/* ---------- interface (só no navegador, com ?anexos=1) ---------- */
+function ativo(){try{return /[?&]anexos=1/.test(root.location.search);}catch(e){return false;}}
+function recKey(mes,cnpj,tipo){return 'rec|'+mes+'|'+so(cnpj)+'|'+tipo;}
+function encurta(s){s=String(s||'');return s.length>14?'…'+s.slice(-10):s;}
+var _css=false;
+function css(){
+ if(_css)return;_css=true;
+ var s=document.createElement('style');
+ s.textContent='.rc-btn{font-size:10px;color:#7a5a00;background:#fff7e0;border:1px solid #e8d48a;border-radius:4px;padding:1px 6px;cursor:pointer;white-space:nowrap;margin-left:4px}.rc-btn input{display:none}.rc-chip{font-size:10px;color:#1e5b2a;background:#e4f2e4;border:1px solid #b6dcb6;border-radius:4px;padding:1px 6px;cursor:pointer;white-space:nowrap;margin-left:4px}.rc-ov{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center}.rc-md{background:#fff;border-radius:10px;max-width:460px;width:92%;padding:16px 18px;box-shadow:0 8px 30px rgba(0,0,0,.3);font-size:13px;color:#222}.rc-md h3{margin:0 0 8px;font-size:15px;color:#12305B}.rc-bd ul{margin:6px 0 0 18px;padding:0}.rc-err{color:#842029}.rc-warn{color:#7a5a00}.rc-ft{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}.rc-ft button{padding:6px 12px;border-radius:6px;border:1px solid #ccc;background:#f5f5f5;cursor:pointer}.rc-ft button.rc-pri{background:#12305B;color:#fff;border-color:#12305B}';
+ document.head.appendChild(s);
+}
+function modal(titulo,html,botoes){
+ css();
+ return new Promise(function(res){
+  var ov=document.createElement('div');ov.className='rc-ov';
+  ov.innerHTML='<div class="rc-md"><h3>'+esc(titulo)+'</h3><div class="rc-bd">'+html+'</div><div class="rc-ft"></div></div>';
+  var ft=ov.querySelector('.rc-ft');
+  botoes.forEach(function(t,i){var b=document.createElement('button');b.textContent=t;if(i===botoes.length-1)b.className='rc-pri';b.onclick=function(){document.body.removeChild(ov);res(i);};ft.appendChild(b);});
+  document.body.appendChild(ov);
+ });
+}
+var _pdf=null;
+function carregarPdf(){
+ if(_pdf)return _pdf;
+ _pdf=new Promise(function(ok,err){
+  if(root.pdfjsLib){ok(root.pdfjsLib);return;}
+  var s=document.createElement('script');s.src=PDFJS;
+  s.onload=function(){root.pdfjsLib.GlobalWorkerOptions.workerSrc=PDFW;ok(root.pdfjsLib);};
+  s.onerror=function(){_pdf=null;err(new Error('Não consegui carregar o leitor de PDF (verifique a internet).'));};
+  document.head.appendChild(s);
+ });
+ return _pdf;
+}
+async function extrairTexto(file){
+ var lib=await carregarPdf();
+ var buf=await file.arrayBuffer();
+ var doc=await lib.getDocument({data:new Uint8Array(buf)}).promise;
+ var out='';
+ for(var p=1;p<=doc.numPages&&p<=10;p++){
+  var pg=await doc.getPage(p);var tc=await pg.getTextContent();
+  out+=tc.items.map(function(i){return i.str;}).join(' ')+' \n ';
+ }
+ return out;
+}
+function btn(ei,nome,id,key){
+ if(!ativo())return '';
+ var tipo=MAPA[nome];if(!tipo)return '';
+ var e=D[ei];if(!e)return '';
+ var rec=ST[recKey(mesSel,e.c,tipo)];
+ if(rec&&rec.ok){
+  return '<span class="rc-chip" onclick="event.stopPropagation();Recibos.detalhes('+ei+',\''+tipo+'\')" title="Ver detalhes do recibo">📎 '+esc(rec.recibo?encurta(rec.recibo):'anexado')+(rec.aviso?' ⚠':'')+'</span>';
+ }
+ return '<label class="rc-btn" onclick="event.stopPropagation()" title="Anexar o recibo em PDF e validar"><span>📎 Anexar recibo</span><input type="file" accept="application/pdf,.pdf" onchange="Recibos.anexar(this,'+ei+',\''+tipo+'\',\''+id+'\',\''+key+'\')"></label>';
+}
+function listaHtml(itens,cls){return '<ul class="'+cls+'">'+itens.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul>';}
+function achaDuplicado(d,cnpj,tipo,chaveAtual){
+ if(!d||!d.recibo)return null;
+ var ks=Object.keys(ST);
+ for(var i=0;i<ks.length;i++){
+  var k=ks[i];if(k.indexOf('rec|')!==0||k===chaveAtual)continue;
+  var r=ST[k];if(r&&r.recibo&&r.recibo===d.recibo)return k;
+ }
+ return null;
+}
+async function anexar(input,ei,tipo,id,key){
+ var file=input.files&&input.files[0];input.value='';
+ if(!file)return;
+ var e=D[ei];
+ try{
+  if(!/\.pdf$/i.test(file.name)&&file.type!=='application/pdf'){await modal('Arquivo inválido','<p>Só aceito arquivos em PDF.</p>',['Fechar']);return;}
+  if(file.size>15*1024*1024){await modal('Arquivo muito grande','<p>O PDF tem mais de 15 MB.</p>',['Fechar']);return;}
+  var texto=await extrairTexto(file);
+  var res=validar({tipoEsperado:tipo,texto:texto,empresa:{c:e.c,n:e.n},mesSel:mesSel,ieSalva:ST['ie|'+so(e.c)]});
+  if(res.ilegivel){
+   var a=await modal('Não consegui ler o PDF','<p>O arquivo parece ser uma imagem ou escaneado, então não dá para conferir CNPJ nem competência.</p><p>Quer aceitar mesmo assim, marcado para <b>conferência manual</b>?</p>',['Cancelar','Aceitar com aviso']);
+   if(a!==1)return;
+   res={ok:true,erros:[],avisos:['Aceito sem leitura do conteúdo — conferir manualmente.'],dados:{tipo:tipo}};
+  }else if(!res.ok){
+   await modal('Recibo recusado','<p><b>'+esc(e.n)+'</b> — '+esc(NOME[tipo])+' — '+esc(labelMes(mesSel))+'</p>'+listaHtml(res.erros,'rc-err'),['Fechar']);
+   return;
+  }
+  var chave=recKey(mesSel,e.c,tipo);
+  var d=res.dados||{};
+  if(root.RECIBOS_DRY){await modal('TESTE: recibo válido (nada foi gravado)','<p><b>'+esc(e.n)+'</b> — '+esc(NOME[tipo])+'</p>'+listaHtml(['Competência: '+(d.mm?d.mm+'/'+d.aa:'—'),'Recibo/protocolo: '+(d.recibo||'—'),'Enviado em: '+(d.data||'—'),'Retificadora: '+(d.retif?'sim':'não'),(res.vincularIE?'Pediria para vincular a IE '+fmtIE(res.vincularIE.ie):'IE: '+(ST['ie|'+so(e.c)]?'conferida':'—'))],'')+(res.avisos&&res.avisos.length?'<p class="rc-warn">⚠ '+esc(res.avisos.join(' '))+'</p>':''),['Fechar']);return;}
+  var dup=achaDuplicado(d,e.c,tipo,chave);
+  if(dup){
+   var p=dup.split('|');
+   await modal('Este recibo já foi usado','<p>O número <b>'+esc(d.recibo)+'</b> já está registrado em outro item (mês '+esc(p[1])+', CNPJ '+esc(fmtCNPJ(p[2]))+', '+esc(NOME[p[3]]||p[3])+').</p>',['Fechar']);
+   return;
+  }
+  if(res.vincularIE){
+   var v=await modal('Vincular a inscrição estadual?','<p>Este recibo da DIME é da inscrição <b>'+esc(fmtIE(res.vincularIE.ie))+'</b> — '+esc(res.vincularIE.nome)+'.</p><p>Vincular essa IE a <b>'+esc(e.n)+'</b> ('+esc(e.c)+')? Nas próximas DIMEs a conferência será pela IE.</p>',['Não','Sim, vincular']);
+   if(v!==1)return;
+   ST['ie|'+so(e.c)]=res.vincularIE.ie;
+  }
+  ST[chave]={ok:true,tipo:tipo,arquivo:file.name,competencia:(d.mm?d.mm+'/'+d.aa:''),recibo:d.recibo||'',dataEnvio:d.data||'',retif:!!d.retif,aviso:(res.avisos||[]).join(' '),por:(typeof nomeUser!=='undefined'&&nomeUser)?nomeUser:'?',quando:new Date().toISOString(),caminho:''};
+  if(tipo==='EFD-ICMS-IPI'&&d.ie&&!ST['ie|'+so(e.c)])ST['ie|'+so(e.c)]=d.ie;
+  var cb=document.getElementById(id);
+  if(cb&&!cb.checked){cb.checked=true;ckRow(id,key,ei,true);}else{saveToFirebase();}
+  render();
+ }catch(err){
+  await modal('Erro ao ler o PDF','<p class="rc-err">'+esc(err&&err.message?err.message:err)+'</p>',['Fechar']);
+ }
+}
+async function detalhes(ei,tipo){
+ var e=D[ei];var chave=recKey(mesSel,e.c,tipo);var r=ST[chave];if(!r)return;
+ var linhas=['Arquivo: '+r.arquivo,'Competência: '+(r.competencia||'—'),'Nº do recibo/protocolo: '+(r.recibo||'—'),'Enviado em: '+(r.dataEnvio||'—'),'Anexado por: '+r.por+' em '+new Date(r.quando).toLocaleString('pt-BR'),'Pasta no servidor: '+(r.caminho||'(não informada)')];
+ var html='<p><b>'+esc(e.n)+'</b> — '+esc(NOME[tipo])+'</p>'+listaHtml(linhas,'')+(r.aviso?'<p class="rc-warn">⚠ '+esc(r.aviso)+'</p>':'');
+ var b=await modal('Recibo anexado',html,['Remover recibo','Informar pasta','Fechar']);
+ if(b===0){
+  var c=await modal('Remover recibo?','<p>O registro do recibo será apagado. O item continua marcado como feito.</p>',['Cancelar','Remover']);
+  if(c===1){delete ST[chave];saveToFirebase();render();}
+ }else if(b===1){
+  var cam=root.prompt('Caminho da pasta no servidor onde o recibo está guardado:',r.caminho||'');
+  if(cam!==null){ST[chave].caminho=cam.trim();saveToFirebase();render();}
+ }
+}
+
+root.Recibos={validar:validar,detectar:detectar,btn:btn,anexar:anexar,detalhes:detalhes,extrairTexto:extrairTexto,MAPA:MAPA,DESLOC:DESLOC,ativo:ativo,nomesBatem:nomesBatem};
+if(typeof module!=='undefined'&&module.exports)module.exports=root.Recibos;
+if(typeof document!=='undefined'&&ativo()){try{if(typeof render==='function')render();}catch(e){}}
+})(typeof window!=='undefined'?window:globalThis);
+
 </script>
 </body>
 </html>
