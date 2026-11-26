@@ -557,6 +557,8 @@ var MAPA={'PGDAS-D':'PGDAS-D','DCTFWeb':'DCTFWEB','DCTFWeb (se retenções)':'DC
 var NOME={'PGDAS-D':'PGDAS-D','DCTFWEB':'DCTFWeb','EFD-CONTRIBUICOES':'EFD-Contribuições','EFD-ICMS-IPI':'EFD ICMS/IPI (SPED Fiscal)','DIME':'DIME'};
 // competência esperada = mês da aba menos N meses (0 = o próprio mês da aba)
 var DESLOC={'PGDAS-D':0,'DCTFWEB':0,'EFD-CONTRIBUICOES':0,'EFD-ICMS-IPI':0,'DIME':0};
+// o bloqueio de marcar sem recibo vale a partir deste mês (YYYY-MM)
+var TRAVA_DESDE='2026-11';
 var CNPJ=/\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}/g;
 
 function so(s){return String(s==null?'':s).replace(/\D/g,'');}
@@ -735,7 +737,7 @@ function btn(ei,nome,id,key){
  return '<label class="rc-btn" onclick="event.stopPropagation()" title="Anexar o recibo em PDF e validar"><span>📎 Anexar recibo</span><input type="file" accept="application/pdf,.pdf" onchange="Recibos.anexar(this,'+ei+',\''+tipo+'\',\''+id+'\',\''+key+'\')"></label>';
 }
 function travado(ei,nome,checked){
- if(!ativo())return false;
+ if(!ativo()||mesSel<TRAVA_DESDE)return false;
  var tipo=MAPA[nome];if(!tipo||nome==='DCTFWeb (se retenções)')return false;
  if(checked)return false;
  var e=D[ei];if(!e)return false;
