@@ -681,7 +681,7 @@ function validar(o){
 }
 
 /* ---------- interface (só no navegador, com ?anexos=1) ---------- */
-function ativo(){try{return /[?&]anexos=1/.test(root.location.search);}catch(e){return false;}}
+function ativo(){try{return !/[?&]anexos=0/.test(root.location.search);}catch(e){return false;}}
 function recKey(mes,cnpj,tipo){return 'rec|'+mes+'|'+so(cnpj)+'|'+tipo;}
 function encurta(s){s=String(s||'');return s.length>14?'…'+s.slice(-10):s;}
 var _css=false;
