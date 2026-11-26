@@ -404,7 +404,7 @@ function buildSecao(titulo,itens,labelTxt,labelClass,secClass,grpKey,isGia,ei){
     const obsVal=(ST[obsKey]&&typeof ST[obsKey]==='string')?ST[obsKey]:'';
     return`<tr id="tr_${id}" class="${okCls}${pendHide}">
       <td class="grp-label ${labelClass}">${j===0?labelTxt:''}</td>
-      <td><div class="chk-row"><input type="checkbox" id="${id}"${checked?' checked':''} onchange="ckRow('${id}','${key}',${ei},this.checked)"><label for="${id}">${nome}${ufTag}${quem}</label>${window.Recibos?Recibos.btn(ei,nome,id,key):''}</div></td>
+      <td><div class="chk-row"><input type="checkbox" id="${id}"${checked?' checked':''}${window.Recibos&&Recibos.travado(ei,nome,checked)?' disabled title="Anexe o recibo para marcar como feito"':''} onchange="ckRow('${id}','${key}',${ei},this.checked)"><label for="${id}">${nome}${ufTag}${quem}</label>${window.Recibos?Recibos.btn(ei,nome,id,key):''}</div></td>
       <td><span class="per">${per}</span></td>
       <td onclick="event.stopPropagation()" style="padding:3px 6px"><textarea rows="1" style="width:100%;font-size:10px;border:0.5px solid #e0dcd0;border-radius:4px;background:#fffef9;color:#444;font-family:inherit;resize:none;outline:none;padding:3px 6px;cursor:text;box-sizing:border-box" placeholder="Anotação..." onclick="event.stopPropagation()" oninput="saveObs('${obsKey}',this.value)">${obsVal}</textarea></td>
     </tr>`;
@@ -730,9 +730,17 @@ function btn(ei,nome,id,key){
  var e=D[ei];if(!e)return '';
  var rec=ST[recKey(mesSel,e.c,tipo)];
  if(rec&&rec.ok){
-  return '<span class="rc-chip" onclick="event.stopPropagation();Recibos.detalhes('+ei+',\''+tipo+'\')" title="Ver detalhes do recibo">📎 '+esc(rec.recibo?encurta(rec.recibo):'anexado')+(rec.aviso?' ⚠':'')+'</span>';
+  return '<span class="rc-chip" onclick="event.stopPropagation();Recibos.detalhes('+ei+',\''+tipo+'\',\''+id+'\',\''+key+'\')" title="Ver detalhes do recibo">📎 '+esc(rec.recibo?encurta(rec.recibo):'anexado')+(rec.aviso?' ⚠':'')+'</span>';
  }
  return '<label class="rc-btn" onclick="event.stopPropagation()" title="Anexar o recibo em PDF e validar"><span>📎 Anexar recibo</span><input type="file" accept="application/pdf,.pdf" onchange="Recibos.anexar(this,'+ei+',\''+tipo+'\',\''+id+'\',\''+key+'\')"></label>';
+}
+function travado(ei,nome,checked){
+ if(!ativo())return false;
+ var tipo=MAPA[nome];if(!tipo||nome==='DCTFWeb (se retenções)')return false;
+ if(checked)return false;
+ var e=D[ei];if(!e)return false;
+ var rec=ST[recKey(mesSel,e.c,tipo)];
+ return !(rec&&rec.ok);
 }
 function listaHtml(itens,cls){return '<ul class="'+cls+'">'+itens.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul>';}
 function achaDuplicado(d,cnpj,tipo,chaveAtual){
@@ -784,21 +792,21 @@ async function anexar(input,ei,tipo,id,key){
   await modal('Erro ao ler o PDF','<p class="rc-err">'+esc(err&&err.message?err.message:err)+'</p>',['Fechar']);
  }
 }
-async function detalhes(ei,tipo){
+async function detalhes(ei,tipo,id,key){
  var e=D[ei];var chave=recKey(mesSel,e.c,tipo);var r=ST[chave];if(!r)return;
  var linhas=['Arquivo: '+r.arquivo,'Competência: '+(r.competencia||'—'),'Nº do recibo/protocolo: '+(r.recibo||'—'),'Enviado em: '+(r.dataEnvio||'—'),'Anexado por: '+r.por+' em '+new Date(r.quando).toLocaleString('pt-BR'),'Pasta no servidor: '+(r.caminho||'(não informada)')];
  var html='<p><b>'+esc(e.n)+'</b> — '+esc(NOME[tipo])+'</p>'+listaHtml(linhas,'')+(r.aviso?'<p class="rc-warn">⚠ '+esc(r.aviso)+'</p>':'');
  var b=await modal('Recibo anexado',html,['Remover recibo','Informar pasta','Fechar']);
  if(b===0){
-  var c=await modal('Remover recibo?','<p>O registro do recibo será apagado. O item continua marcado como feito.</p>',['Cancelar','Remover']);
-  if(c===1){delete ST[chave];saveToFirebase();render();}
+  var c=await modal('Remover recibo?','<p>O registro do recibo será apagado e o item será desmarcado.</p>',['Cancelar','Remover']);
+  if(c===1){delete ST[chave];var cb2=id?document.getElementById(id):null;if(cb2&&cb2.checked){cb2.checked=false;ckRow(id,key,ei,false);}saveToFirebase();render();}
  }else if(b===1){
   var cam=root.prompt('Caminho da pasta no servidor onde o recibo está guardado:',r.caminho||'');
   if(cam!==null){ST[chave].caminho=cam.trim();saveToFirebase();render();}
  }
 }
 
-root.Recibos={validar:validar,detectar:detectar,btn:btn,anexar:anexar,detalhes:detalhes,extrairTexto:extrairTexto,MAPA:MAPA,DESLOC:DESLOC,ativo:ativo,nomesBatem:nomesBatem};
+root.Recibos={validar:validar,detectar:detectar,btn:btn,travado:travado,anexar:anexar,detalhes:detalhes,extrairTexto:extrairTexto,MAPA:MAPA,DESLOC:DESLOC,ativo:ativo,nomesBatem:nomesBatem};
 if(typeof module!=='undefined'&&module.exports)module.exports=root.Recibos;
 if(typeof document!=='undefined'&&ativo()){try{if(typeof render==='function')render();}catch(e){}}
 })(typeof window!=='undefined'?window:globalThis);
